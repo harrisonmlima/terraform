@@ -1,29 +1,78 @@
-terraform {
-  required_providers {
-    digitalocean = {
-      source  = "digitalocean/digitalocean"
-      version = "~> 2.0"
-    }
-  }
-}
 
-# Configure the DigitalOcean Provider
-provider "digitalocean" {
-  token = var.do_token
-}
-
+#olhar na documentação do registry.terraform.io
 resource "digitalocean_droplet" "jenkins" {
-  image    = "ubuntu-22-04-x64"
-  name     = var.ssh_key_name
+  image    = "ubuntu-20-04-x64"
+  name     = var.nome_droplet
   region   = var.region
-  size     = "s-2vcpu-2gb"
-  ssh_keys = [data.digitalocean_ssh_key.ssh_key.id]
+  size     = "s-2vcpu-4gb"
+  ssh_keys = [data.digitalocean_ssh_key.minha_chave.id]
+  tags = [
+    "desenvolvimento"
+  ]
+}
+#olhar na documentação e o segundo nom do id é o nome do resource do provider
+resource "digitalocean_firewall" "fw_labs" {
+  name = "fw-labs"
+
+  droplet_ids = [digitalocean_droplet.jenkins.id]
+
+  inbound_rule {
+    protocol         = "tcp"
+    port_range       = "22"
+    source_addresses = ["0.0.0.0/0", "::/0"]
+  }
+
+  inbound_rule {
+    protocol         = "tcp"
+    port_range       = "80"
+    source_addresses = ["0.0.0.0/0", "::/0"]
+  }
+  
+  inbound_rule {
+    protocol         = "tcp"
+    port_range       = "8080"
+    source_addresses = ["0.0.0.0/0", "::/0"]
+  }
+  
+
+  inbound_rule {
+    protocol         = "tcp"
+    port_range       = "443"
+    source_addresses = ["0.0.0.0/0", "::/0"]
+  }
+
+  outbound_rule {
+    protocol              = "tcp"
+    port_range            = "443"
+    destination_addresses = ["0.0.0.0/0", "::/0"]
+  }
+
+  outbound_rule {
+    protocol              = "tcp"
+    port_range            = "80"
+    destination_addresses = ["0.0.0.0/0", "::/0"]
+  }
+
+  outbound_rule {
+    protocol              = "tcp"
+    port_range            = "22"
+    destination_addresses = ["0.0.0.0/0", "::/0"]
+  }
+
+  outbound_rule {
+    protocol              = "tcp"
+    port_range            = "53"
+    destination_addresses = ["0.0.0.0/0", "::/0"]
+  }
+
+  outbound_rule {
+    protocol              = "udp"
+    port_range            = "53"
+    destination_addresses = ["0.0.0.0/0", "::/0"]
+  }
 
 }
 
-data "digitalocean_ssh_key" "ssh_key" {
-  name = var.ssh_key_name
-}
 
 resource "digitalocean_kubernetes_cluster" "k8s" {
   name   = "k8s"
@@ -32,29 +81,8 @@ resource "digitalocean_kubernetes_cluster" "k8s" {
   version = "1.24.4-do.0"
 
   node_pool {
-    name       = "default"
+    name       = "worker-pool"
     size       = "s-2vcpu-2gb"
-    node_count = 2
-
+    node_count = 3
   }
-}
-
-variable "region" {
-  default = ""
-}
-variable "do_token" {
-  default = ""
-}
-
-variable "ssh_key_name" {
-  default = ""
-}
-
-output "jenkins_ip" {
- value = digitalocean_droplet.jenkins.ipv4_address   
-}
-
-resource "local_file" "foo" {
-    content  = digitalocean_kubernetes_cluster.k8s.kube_config.0.raw_config
-    filename = "kube_config.yaml"
 }
